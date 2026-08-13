@@ -1,0 +1,16 @@
+# Keep the build context small and free of secrets.
+**/node_modules
+**/dist
+.git
+.gitignore
+.github
+.hubbify
+infra/.env
+infra/.env.*
+!infra/.env.base
+**/*.log
+.vscode
+.idea
+.DS_Store
+docs
+README.md

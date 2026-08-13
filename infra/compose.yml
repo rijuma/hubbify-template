@@ -1,0 +1,43 @@
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: '10m'
+      max-file: '3'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.web
+    networks:
+      - default
+      - proxy
+    labels:
+      caddy: myapp.localhost
+      caddy.reverse_proxy: '{{upstreams 3000}}'
+    <<: *logging
+
+  # Uncomment to add a database (stays on the default network only —
+  # invisible to the proxy and to other projects):
+  # postgres:
+  #   image: postgres:17-alpine
+  #   environment:
+  #     - POSTGRES_USER=${POSTGRES_USER:-postgres}
+  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+  #     - POSTGRES_DB=${POSTGRES_DB:-app}
+  #   volumes:
+  #     - pgdata:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U postgres"]
+  #     interval: 5s
+  #     timeout: 3s
+  #     retries: 5
+  #   <<: *logging
+
+networks:
+  proxy:
+    external: true
+
+# volumes:
+#   pgdata:
