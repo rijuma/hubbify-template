@@ -1,14 +1,14 @@
-# Remote delta: real domain (overrides only the `caddy` label; compose merges
+# Prod delta: real domain (overrides only the `caddy` label; compose merges
 # labels by key), production image, and hardening.
 services:
   web:
     build:
       target: prod
     env_file:
-      # Production secrets. The deploy workflow writes this file on the runner
+      # Production secrets. The Deploy workflow writes this file on the runner
       # from the GitHub environment's ENV_FILE secret; it never lives locally.
       # Resolved from the project root (--project-directory), not this folder.
-      - path: infra/.env.remote
+      - path: envs/prod/.env
         required: false
     restart: unless-stopped
     mem_limit: 512m
@@ -22,7 +22,6 @@ services:
       timeout: 3s
       retries: 3
 
-  # Harden the database too when enabled:
-  # postgres:
-  #   restart: unless-stopped
-  #   mem_limit: 512m
+  # A database for this env is declared here too (see envs/local/compose.yml
+  # for the full block, plus restart/mem_limit hardening) — or skip it and
+  # point DATABASE_URL in envs/prod/.env at a managed instance instead.

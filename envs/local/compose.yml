@@ -1,0 +1,45 @@
+# Local development delta: dev image with hot reload via mounted sources.
+# Local-only env/secrets live in envs/local/.env (gitignored, optional).
+# No server.conf in this folder → this is a local env.
+services:
+  web:
+    build:
+      target: dev
+    env_file:
+      # Resolved from the project root (--project-directory), not this folder.
+      - path: envs/local/.env
+        required: false
+    volumes:
+      - ./web/src:/app/src
+      - ./web/public:/app/public
+    develop:
+      watch:
+        - action: rebuild
+          path: ./web/package.json
+    # With a database enabled below, make the app wait for it:
+    # depends_on:
+    #   postgres:
+    #     condition: service_healthy
+
+  # Services that differ per environment (like a database) live in the env
+  # overlays that need them, not in infra/compose.yml — an overlay can add
+  # and override, but not remove. Uncomment to add a local database (default
+  # network only — invisible to the proxy and to other projects):
+  # postgres:
+  #   image: postgres:17-alpine
+  #   environment:
+  #     - POSTGRES_USER=${POSTGRES_USER:-postgres}
+  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+  #     - POSTGRES_DB=${POSTGRES_DB:-app}
+  #   volumes:
+  #     - pgdata:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U postgres"]
+  #     interval: 5s
+  #     timeout: 3s
+  #     retries: 5
+  #   ports: # dev-only convenience: reach it from the host
+  #     - "5432:5432"
+
+# volumes:
+#   pgdata:
