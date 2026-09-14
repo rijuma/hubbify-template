@@ -34,8 +34,8 @@ server, and `up`/`dev`/`down` refuse remote envs. Nothing runs server-side.
   host ports (dev-only exceptions live in `envs/local/compose.yml`).
 - **Secrets:** each env's secrets live in `envs/<env>/.env` (gitignored).
   Local ones are hand-written; remote ones are the `ENV_FILE` secret of the
-  same-named GitHub environment, written by the Deploy workflow on the
-  runner. Secrets never go in compose files or commits.
+  GitHub environment that deploys the folder (same name, or the `ENV=` in
+  its `server.conf`), written by the Deploy workflow on the runner. Secrets never go in compose files or commits.
 
 ## Conventions
 

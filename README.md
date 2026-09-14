@@ -38,7 +38,7 @@ envs/
 │   ├── compose.yml     # dev delta: hot reload, source mounts, local db
 │   └── .env.example    # copy to .env (gitignored, optional)
 └── prod/
-    ├── server.conf     # DOCKER_CONTEXT, SERVER_NAME, PROTECTED=true
+    ├── server.conf     # DOCKER_CONTEXT, SERVER_NAME, PROTECTED=true, optional ENV
     ├── compose.yml     # real domain, prod image, hardening
     └── .env.example    # real values come from CI (or a local .env)
 ```
@@ -70,9 +70,12 @@ need them — the base holds only what is true everywhere.
 ## Deploying
 
 The canonical deploy is the **Deploy** GitHub workflow (manual dispatch,
-pick the environment). It builds and runs the app on your server over a
-docker SSH context — no agent, no git checkout on the server. Create one
-GitHub environment per `envs/` folder, named identically, with:
+pick the GitHub environment). It builds and runs the app on your server
+over a docker SSH context — no agent, no git checkout on the server. Create
+one GitHub environment per `envs/` folder that has a `server.conf`. The
+environment is named like the folder, or the folder's `server.conf`
+declares `ENV=<github environment>` when the names differ (`production`
+for `envs/prod`). Each GitHub environment carries:
 
 | Kind     | Name              | Value                                                 |
 | -------- | ----------------- | ----------------------------------------------------- |
@@ -81,7 +84,14 @@ GitHub environment per `envs/` folder, named identically, with:
 | secret   | `SSH_KNOWN_HOSTS` | output of `ssh-keyscan <server>` (pins the host key)  |
 | secret   | `ENV_FILE`        | the app's env for that target, verbatim (`KEY=value`) |
 
-The workflow writes `ENV_FILE` to `envs/<env>/.env` on the runner and runs
+A `check` job resolves the folder first (a `server.conf` with a matching
+`ENV=`, else the folder of the same name) and fails listing the remote
+envs when none exists; it has no environment binding, so nothing is
+created on GitHub by mistake. The deploy job then fails with a pointer to
+Settings → Environments when the chosen environment has no `SERVER_SSH`
+yet, so a missing setup is one clear error instead of an SSH failure. It
+then writes `ENV_FILE`
+to `envs/<env>/.env` on the runner and runs
 the same `just deploy <env>` you'd run by hand — secrets never live on a
 laptop. Put the human gate in the GitHub environment's protection rules
 (required reviewers, "prod deploys only from main"). To roll back, re-run

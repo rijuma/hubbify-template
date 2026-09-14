@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: Environment to deploy (a folder in envs/ with a server.conf)
+        description: "GitHub environment to deploy. Its envs/ folder is the one whose server.conf has ENV=<name>, else the one with the same name"
         type: environment
         required: true
 
@@ -16,17 +16,59 @@ permissions:
   contents: read
 
 jobs:
+  # Maps the GitHub environment to its envs/ folder: a server.conf declaring
+  # ENV=<github environment> wins, otherwise the folder of the same name.
+  # Runs before the environment is resolved, so a typo creates nothing.
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      folder: ${{ steps.resolve.outputs.folder }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Resolve the envs/ folder
+        id: resolve
+        run: |
+          name="${{ inputs.environment }}"
+          matches=$(grep -lx "ENV=$name" envs/*/server.conf 2>/dev/null || true)
+          count=$(printf '%s' "$matches" | grep -c . || true)
+          if [ "$count" -gt 1 ]; then
+            echo "::error::ENV=$name is declared in more than one server.conf: $(echo $matches)"
+            exit 1
+          fi
+          if [ "$count" -eq 1 ]; then
+            folder=$(basename "$(dirname "$matches")")
+          else
+            folder="$name"
+          fi
+          if [ ! -f "envs/$folder/server.conf" ]; then
+            remote=$(ls envs/*/server.conf 2>/dev/null | xargs -n1 dirname | xargs -n1 basename | tr '\n' ' ')
+            echo "::error::No envs/ folder for GitHub environment '$name' (looked for ENV=$name in a server.conf, then envs/$name). Remote envs: ${remote:-none}"
+            exit 1
+          fi
+          echo "Deploying envs/$folder for GitHub environment '$name'"
+          echo "folder=$folder" >> "$GITHUB_OUTPUT"
+
   deploy:
+    needs: check
     # Skip in the original template repo (no environments configured there)
     if: ${{ !github.event.repository.is_template }}
     runs-on: ubuntu-latest
-    # GitHub environment names match envs/ folder names 1:1. Protection rules
-    # (required reviewers, deployment branches) are the confirmation gate
-    # here — `just deploy` skips its interactive prompt when CI is set.
+    # Protection rules of the GitHub environment (required reviewers,
+    # deployment branches) are the confirmation gate here — `just deploy`
+    # skips its interactive prompt when CI is set.
     environment: ${{ inputs.environment }}
 
     steps:
       - uses: actions/checkout@v5
+
+      - name: Check the GitHub environment is configured
+        env:
+          SERVER_SSH: ${{ vars.SERVER_SSH }}
+        run: |
+          if [ -z "$SERVER_SSH" ]; then
+            echo "::error::GitHub environment '${{ inputs.environment }}' has no SERVER_SSH variable. Create the environment under Settings → Environments with SERVER_SSH, SSH_PRIVATE_KEY, SSH_KNOWN_HOSTS and ENV_FILE (README, Deploying)."
+            exit 1
+          fi
 
       - name: SSH setup
         env:
@@ -49,7 +91,7 @@ jobs:
 
       - name: Create the docker context the env expects
         run: |
-          source "envs/${{ inputs.environment }}/server.conf"
+          source "envs/${{ needs.check.outputs.folder }}/server.conf"
           docker context create "$DOCKER_CONTEXT" --docker "host=ssh://${{ vars.SERVER_SSH }}"
 
       - name: Write env file
@@ -57,12 +99,12 @@ jobs:
           ENV_FILE: ${{ secrets.ENV_FILE }}
         run: |
           umask 077
-          printf '%s' "$ENV_FILE" > "envs/${{ inputs.environment }}/.env"
+          printf '%s' "$ENV_FILE" > "envs/${{ needs.check.outputs.folder }}/.env"
 
       - uses: extractions/setup-just@v4
 
       - name: Deploy
-        run: just deploy ${{ inputs.environment }}
+        run: just deploy ${{ needs.check.outputs.folder }}
 
       - name: Status
-        run: just ps ${{ inputs.environment }}
+        run: just ps ${{ needs.check.outputs.folder }}
