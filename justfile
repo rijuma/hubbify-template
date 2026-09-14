@@ -16,6 +16,14 @@ _resolve := '''
         remote=1
         docker=(docker --context "$DOCKER_CONTEXT")
     fi
+    if ! "${docker[@]}" info >/dev/null 2>&1; then
+        if [ -n "$remote" ]; then
+            echo "Docker can't reach context '$DOCKER_CONTEXT' for '$env'. Is Docker running locally, and is the server reachable over SSH?"
+        else
+            echo "Docker isn't running. Start Docker Desktop (or the docker daemon) and retry."
+        fi
+        exit 1
+    fi
     name="${COMPOSE_PROJECT:-$project-$env}"
     files=(-f infra/compose.yml)
     [ -f "$dir/compose.yml" ] && files+=(-f "$dir/compose.yml")
@@ -91,11 +99,26 @@ ps env="local":
 # ─── Deploy (remote envs only) ────────────────────────────────────────
 
 [group('remote')]
-[doc('Build and deploy an env to its server, e.g. `just deploy prod`')]
-deploy env:
+[doc('Build and deploy an env to its server, e.g. `just deploy prod` (bare `just deploy` lists targets)')]
+deploy env="":
     #!/usr/bin/env bash
     set -euo pipefail
     env="{{ env }}" project="{{ project }}"
+    if [ -z "$env" ]; then
+        echo "Usage: just deploy <env>"
+        echo
+        echo "Remote envs (folders under envs/ with a server.conf):"
+        for conf in envs/*/server.conf; do
+            [ -f "$conf" ] || continue
+            (
+                source "$conf"
+                extra=""
+                [ "${PROTECTED:-false}" = "true" ] && extra=", protected"
+                echo "  $(basename "$(dirname "$conf")") → server $SERVER_NAME (context $DOCKER_CONTEXT$extra)"
+            )
+        done
+        exit 0
+    fi
     {{ _resolve }}
     [ -n "$remote" ] || { echo "'$env' has no server.conf — it's a local env, use \`just up $env\`."; exit 1; }
     if [ "${PROTECTED:-false}" = "true" ] && [ -z "${CI:-}" ]; then
