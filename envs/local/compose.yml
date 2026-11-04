@@ -26,13 +26,13 @@ services:
   # and override, but not remove. Uncomment to add a local database (default
   # network only — invisible to the proxy and to other projects):
   # postgres:
-  #   image: postgres:17-alpine
+  #   image: postgres:18-alpine
   #   environment:
   #     - POSTGRES_USER=${POSTGRES_USER:-postgres}
   #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
   #     - POSTGRES_DB=${POSTGRES_DB:-app}
   #   volumes:
-  #     - pgdata:/var/lib/postgresql/data
+  #     - pgdata:/var/lib/postgresql
   #   healthcheck:
   #     test: ["CMD-SHELL", "pg_isready -U postgres"]
   #     interval: 5s
