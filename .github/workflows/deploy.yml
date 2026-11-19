@@ -24,11 +24,13 @@ jobs:
     outputs:
       folder: ${{ steps.resolve.outputs.folder }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Resolve the envs/ folder
         id: resolve
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
         run: |
-          name="${{ inputs.environment }}"
+          name="$ENVIRONMENT"
           matches=$(grep -lx "ENV=$name" envs/*/server.conf 2>/dev/null || true)
           count=$(printf '%s' "$matches" | grep -c . || true)
           if [ "$count" -gt 1 ]; then
@@ -59,14 +61,24 @@ jobs:
     environment: ${{ inputs.environment }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      # Before any secret is on disk, so no third-party action runs with them.
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
 
       - name: Check the GitHub environment is configured
         env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          # Environment variable set per GitHub environment: deploy@your-server-ip
           SERVER_SSH: ${{ vars.SERVER_SSH }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
         run: |
           if [ -z "$SERVER_SSH" ]; then
-            echo "::error::GitHub environment '${{ inputs.environment }}' has no SERVER_SSH variable. Create the environment under Settings → Environments with SERVER_SSH, SSH_PRIVATE_KEY, SSH_KNOWN_HOSTS and ENV_FILE (README, Deploying)."
+            echo "::error::GitHub environment '$ENVIRONMENT' has no SERVER_SSH variable. Create the environment under Settings → Environments with SERVER_SSH, SSH_PRIVATE_KEY, SSH_KNOWN_HOSTS and ENV_FILE (README, Deploying)."
+            exit 1
+          fi
+          if [ -z "$SSH_KNOWN_HOSTS" ]; then
+            echo "::error::GitHub environment '$ENVIRONMENT' has no SSH_KNOWN_HOSTS secret. Set it to the output of \`ssh-keyscan <server>\`, checked against the server's real host key (README, Deploying)."
             exit 1
           fi
 
@@ -74,37 +86,35 @@ jobs:
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
-          # Environment variable set per GitHub environment: deploy@your-server-ip
-          SERVER_SSH: ${{ vars.SERVER_SSH }}
         run: |
           mkdir -p ~/.ssh
           printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          # Prefer a pinned host key (set the SSH_KNOWN_HOSTS secret to the
-          # output of `ssh-keyscan <server>`); fall back to TOFU if unset.
-          if [ -n "$SSH_KNOWN_HOSTS" ]; then
-            printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          else
-            echo "::warning::SSH_KNOWN_HOSTS not set — trusting host key on first use"
-            ssh-keyscan -H "${SERVER_SSH#*@}" >> ~/.ssh/known_hosts
-          fi
+          # Pinned host key only: the previous step fails when the secret is unset.
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
       - name: Create the docker context the env expects
+        env:
+          FOLDER: ${{ needs.check.outputs.folder }}
+          SERVER_SSH: ${{ vars.SERVER_SSH }}
         run: |
-          source "envs/${{ needs.check.outputs.folder }}/server.conf"
-          docker context create "$DOCKER_CONTEXT" --docker "host=ssh://${{ vars.SERVER_SSH }}"
+          source "envs/$FOLDER/server.conf"
+          docker context create "$DOCKER_CONTEXT" --docker "host=ssh://$SERVER_SSH"
 
       - name: Write env file
         env:
           ENV_FILE: ${{ secrets.ENV_FILE }}
+          FOLDER: ${{ needs.check.outputs.folder }}
         run: |
           umask 077
-          printf '%s' "$ENV_FILE" > "envs/${{ needs.check.outputs.folder }}/.env"
-
-      - uses: extractions/setup-just@v4
+          printf '%s' "$ENV_FILE" > "envs/$FOLDER/.env"
 
       - name: Deploy
-        run: just deploy ${{ needs.check.outputs.folder }}
+        env:
+          FOLDER: ${{ needs.check.outputs.folder }}
+        run: just deploy "$FOLDER"
 
       - name: Status
-        run: just ps ${{ needs.check.outputs.folder }}
+        env:
+          FOLDER: ${{ needs.check.outputs.folder }}
+        run: just ps "$FOLDER"

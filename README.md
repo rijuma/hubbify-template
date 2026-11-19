@@ -77,25 +77,26 @@ environment is named like the folder, or the folder's `server.conf`
 declares `ENV=<github environment>` when the names differ (`production`
 for `envs/prod`). Each GitHub environment carries:
 
-| Kind     | Name              | Value                                                 |
-| -------- | ----------------- | ----------------------------------------------------- |
-| variable | `SERVER_SSH`      | `deploy@your-server-ip`                               |
-| secret   | `SSH_PRIVATE_KEY` | key authorized for that user                          |
-| secret   | `SSH_KNOWN_HOSTS` | output of `ssh-keyscan <server>` (pins the host key)  |
-| secret   | `ENV_FILE`        | the app's env for that target, verbatim (`KEY=value`) |
+| Kind     | Name              | Value                                                                |
+| -------- | ----------------- | -------------------------------------------------------------------- |
+| variable | `SERVER_SSH`      | `deploy@your-server-ip`                                              |
+| secret   | `SSH_PRIVATE_KEY` | key authorized for that user                                         |
+| secret   | `SSH_KNOWN_HOSTS` | required; output of `ssh-keyscan <server>`; deploy aborts without it |
+| secret   | `ENV_FILE`        | the app's env for that target, verbatim (`KEY=value`)                |
 
 A `check` job resolves the folder first (a `server.conf` with a matching
 `ENV=`, else the folder of the same name) and fails listing the remote
 envs when none exists; it has no environment binding, so nothing is
 created on GitHub by mistake. The deploy job then fails with a pointer to
 Settings → Environments when the chosen environment has no `SERVER_SSH`
-yet, so a missing setup is one clear error instead of an SSH failure. It
-then writes `ENV_FILE`
-to `envs/<env>/.env` on the runner and runs
-the same `just deploy <env>` you'd run by hand — secrets never live on a
-laptop. Put the human gate in the GitHub environment's protection rules
-(required reviewers, "prod deploys only from main"). To roll back, re-run
-the workflow from the previous commit.
+yet, and with an error when it has no `SSH_KNOWN_HOSTS` (the host key is
+pinned, never trusted on first use; check the `ssh-keyscan` output against
+the server's real host key), so a missing setup is one clear error instead
+of an SSH failure. It then writes `ENV_FILE` to `envs/<env>/.env` on the
+runner and runs the same `just deploy <env>` you'd run by hand — secrets
+never live on a laptop. Put the human gate in the GitHub environment's
+protection rules (required reviewers, "prod deploys only from main"). To
+roll back, re-run the workflow from the previous commit.
 
 For a break-glass manual deploy, create the context `server.conf` names and
 run the recipe (whatever `envs/<env>/.env` you have locally is what ships):
