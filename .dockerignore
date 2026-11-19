@@ -5,9 +5,7 @@
 .gitignore
 .github
 .hubbify
-infra/.env
-infra/.env.*
-!infra/.env.base
+envs/*/.env
 **/*.log
 .vscode
 .idea
