@@ -78,7 +78,7 @@ jobs:
           SERVER_SSH: ${{ vars.SERVER_SSH }}
         run: |
           mkdir -p ~/.ssh
-          printf '%s' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           # Prefer a pinned host key (set the SSH_KNOWN_HOSTS secret to the
           # output of `ssh-keyscan <server>`); fall back to TOFU if unset.
