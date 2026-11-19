@@ -11,7 +11,7 @@ environment name — a folder under `envs/` — defaulting to `local`: `just dev
 `just up`, `just logs prod`, `just ps stg`, `just sh prod web`. An env folder
 with a `server.conf` is a remote target reached through the docker SSH
 context it declares; `just deploy <env>` is the only recipe that touches a
-server, and `up`/`dev`/`down` refuse remote envs. Nothing runs server-side.
+server, and `up`/`dev`/`stop`/`down` refuse remote envs. Nothing runs server-side.
 
 ## Hard rules
 

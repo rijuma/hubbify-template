@@ -67,6 +67,16 @@ down env="local":
     {{ _local_only }}
     "${compose[@]}" down
 
+[group('dev')]
+[doc('Stop a local env and keep its containers; `just up` starts it again')]
+stop env="local" *service:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    env="{{ env }}" project="{{ project }}"
+    {{ _resolve }}
+    {{ _local_only }}
+    "${compose[@]}" stop {{ service }}
+
 # ─── Any env, local or remote ─────────────────────────────────────────
 
 [group('env')]
