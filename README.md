@@ -103,8 +103,7 @@ Put the human gate in the GitHub environment's protection rules (required
 reviewers, "prod deploys only from main"). To roll back, re-run the
 workflow from the previous commit.
 
-The workflow actions are pinned by commit SHA, and Dependabot
-(`.github/dependabot.yml`) opens the PRs that bump them weekly. To keep
+The workflow actions are pinned by commit SHA and bumped by hand. To keep
 them pinned, whoever owns the repository should add a ruleset on `main`
 and turn on the Actions setting "Require actions to be pinned to a
 full-length commit SHA" (both by hand in the GitHub settings).
