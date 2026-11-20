@@ -71,14 +71,24 @@ jobs:
           ENVIRONMENT: ${{ inputs.environment }}
           # Environment variable set per GitHub environment: deploy@your-server-ip
           SERVER_SSH: ${{ vars.SERVER_SSH }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          ENV_FILE: ${{ secrets.ENV_FILE }}
         run: |
           if [ -z "$SERVER_SSH" ]; then
             echo "::error::GitHub environment '$ENVIRONMENT' has no SERVER_SSH variable. Create the environment under Settings → Environments with SERVER_SSH, SSH_PRIVATE_KEY, SSH_KNOWN_HOSTS and ENV_FILE (README, Deploying)."
             exit 1
           fi
+          if [ -z "$SSH_PRIVATE_KEY" ]; then
+            echo "::error::GitHub environment '$ENVIRONMENT' has no SSH_PRIVATE_KEY secret. Set it to the private key authorized for the SERVER_SSH user (README, Deploying)."
+            exit 1
+          fi
           if [ -z "$SSH_KNOWN_HOSTS" ]; then
             echo "::error::GitHub environment '$ENVIRONMENT' has no SSH_KNOWN_HOSTS secret. Set it to the output of \`ssh-keyscan <server>\`, checked against the server's real host key (README, Deploying)."
+            exit 1
+          fi
+          if [ -z "$ENV_FILE" ]; then
+            echo "::error::GitHub environment '$ENVIRONMENT' has no ENV_FILE secret. Set it to the app's env for this target, verbatim (KEY=value lines); an env with no values still needs it, set to a comment line such as '# no values' (README, Deploying)."
             exit 1
           fi
 

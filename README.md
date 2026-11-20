@@ -80,23 +80,34 @@ for `envs/prod`). Each GitHub environment carries:
 | Kind     | Name              | Value                                                                |
 | -------- | ----------------- | -------------------------------------------------------------------- |
 | variable | `SERVER_SSH`      | `deploy@your-server-ip`                                              |
-| secret   | `SSH_PRIVATE_KEY` | key authorized for that user                                         |
+| secret   | `SSH_PRIVATE_KEY` | required; key authorized for that user                               |
 | secret   | `SSH_KNOWN_HOSTS` | required; output of `ssh-keyscan <server>`; deploy aborts without it |
-| secret   | `ENV_FILE`        | the app's env for that target, verbatim (`KEY=value`)                |
+| secret   | `ENV_FILE`        | required; the app's env for that target, verbatim (`KEY=value`)      |
+
+An env with no values still needs `ENV_FILE`: set it to a comment line
+such as `# no values` (GitHub cannot store an empty secret).
 
 A `check` job resolves the folder first (a `server.conf` with a matching
 `ENV=`, else the folder of the same name) and fails listing the remote
 envs when none exists; it has no environment binding, so nothing is
 created on GitHub by mistake. The deploy job then fails with a pointer to
 Settings → Environments when the chosen environment has no `SERVER_SSH`
-yet, and with an error when it has no `SSH_KNOWN_HOSTS` (the host key is
-pinned, never trusted on first use; check the `ssh-keyscan` output against
-the server's real host key), so a missing setup is one clear error instead
-of an SSH failure. It then writes `ENV_FILE` to `envs/<env>/.env` on the
-runner and runs the same `just deploy <env>` you'd run by hand — secrets
-never live on a laptop. Put the human gate in the GitHub environment's
-protection rules (required reviewers, "prod deploys only from main"). To
-roll back, re-run the workflow from the previous commit.
+yet, and with an error naming the missing secret when it has no
+`SSH_PRIVATE_KEY`, `SSH_KNOWN_HOSTS` (the host key is pinned, never
+trusted on first use; check the `ssh-keyscan` output against the server's
+real host key) or `ENV_FILE`, so a missing setup of any of the four is
+one clear error instead of an SSH failure or an empty env file. It then
+writes `ENV_FILE` to `envs/<env>/.env` on the runner and runs the same
+`just deploy <env>` you'd run by hand — secrets never live on a laptop.
+Put the human gate in the GitHub environment's protection rules (required
+reviewers, "prod deploys only from main"). To roll back, re-run the
+workflow from the previous commit.
+
+The workflow actions are pinned by commit SHA, and Dependabot
+(`.github/dependabot.yml`) opens the PRs that bump them weekly. To keep
+them pinned, whoever owns the repository should add a ruleset on `main`
+and turn on the Actions setting "Require actions to be pinned to a
+full-length commit SHA" (both by hand in the GitHub settings).
 
 For a break-glass manual deploy, create the context `server.conf` names and
 run the recipe (whatever `envs/<env>/.env` you have locally is what ships):
