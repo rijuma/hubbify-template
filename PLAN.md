@@ -1,0 +1,25 @@
+# Plan: Follow-ups from the security audit fixes (template side)
+
+Source: `FOLLOW-UPS.md` (sections referenced per step). Rests on: none.
+
+Workflow: `/next-step` does the first unchecked step and stops;
+`/implement-steps` loops it and commits each step.
+
+Verify after every step: `npm --prefix web test`
+On close, delete: `PLAN.md`, `FOLLOW-UPS.md`
+
+## Decisions (do not reopen)
+
+- An unset `ENV_FILE` secret aborts the deploy, the same as an unset `SSH_KNOWN_HOSTS`: the hard rule in `AGENTS.md` is "Deploys fail closed", and GitHub cannot store an empty secret, so empty always means "never set". A project whose env has no values sets `ENV_FILE` to a single comment line (e.g. `# no values`); the README says so.
+- The two source items (deploy secret checks, Dependabot) are one step: each is under 20 lines and both live in `.github/`.
+- Dependabot covers only the `github-actions` ecosystem, which is what the source asks for. No `npm` entry for `web/`, no grouping, no auto-merge. The step does not bump the action pins by hand either: Dependabot's first run opens those PRs.
+- Source bullet "GitHub repository settings (manual, not a code step)" (ruleset on `main`, "require actions to be pinned to a full-length commit SHA") is left out: it is a change in the GitHub settings UI that the user does by hand, not a change in this repository. It stays the user's task after this plan closes.
+
+## Steps
+
+- [ ] **1. Fail closed on every missing deploy secret, and let Dependabot move the action pins** — Two small changes under `.github/`. (a) In `.github/workflows/deploy.yml`, job `deploy`, step `Check the GitHub environment is configured`: today it tests only `SERVER_SSH` and `SSH_KNOWN_HOSTS`. Add `SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}` and `ENV_FILE: ${{ secrets.ENV_FILE }}` to that step's own `env:` block (expressions reach scripts only through `env`, never inline in `run`) and fail with one `::error::` each when empty, in the style of the two existing messages: name the GitHub environment, the missing secret, what to put in it, and "(README, Deploying)". The `ENV_FILE` message says that an env with no values still needs the secret, set to a comment line. Never echo a secret's value. The step stays where it is, before `SSH setup` and `Write env file`, so nothing is written to disk when a secret is missing; leave those later steps, the `check` job and the `justfile` guards untouched. In `README.md`, section "Deploying" (the "Via GitHub Actions" part): the table rows for `SSH_PRIVATE_KEY` and `ENV_FILE` say `required` the way the `SSH_KNOWN_HOSTS` row does, the `ENV_FILE` row or the paragraph below mentions the comment-line value for an env without values, and the paragraph that starts "A `check` job resolves the folder first" is reworded so its claim "a missing setup is one clear error instead of an SSH failure" covers all four settings (`SERVER_SSH`, `SSH_PRIVATE_KEY`, `SSH_KNOWN_HOSTS`, `ENV_FILE`). (b) Create `.github/dependabot.yml`: `version: 2`, one `updates` entry with `package-ecosystem: github-actions`, `directory: /`, `schedule.interval: weekly`, nothing else. Every `uses:` in `.github/workflows/ci.yml` and `.github/workflows/deploy.yml` is pinned to a commit SHA with a `# vX.Y.Z` comment; Dependabot updates both the SHA and the comment, so do not edit the pins. Add one sentence to `README.md` (near the end of the "Via GitHub Actions" part) saying the workflow actions are pinned by SHA and Dependabot opens the PRs that bump them. `AGENTS.md` needs no change (`CLAUDE.md` is a symlink to it). Read: `FOLLOW-UPS.md` § "Follow-ups from security audit fixes (template side)", the first bullet (step `Check the GitHub environment is configured`) and the second bullet (`.github/dependabot.yml`); `README.md` § "Deploying"; `AGENTS.md` § "Hard rules" ("Deploys fail closed", "Secrets"). Depends on: none. Touches: `.github/workflows/deploy.yml`, `.github/dependabot.yml`, `README.md`. Done when: `test "$(grep -c 'secrets.ENV_FILE' .github/workflows/deploy.yml)" -ge 2 && test "$(grep -c 'secrets.SSH_PRIVATE_KEY' .github/workflows/deploy.yml)" -ge 2 && test "$(grep -c '::error::GitHub environment' .github/workflows/deploy.yml)" -ge 4 && test "$(grep -E '^\| secret +\| .(ENV_FILE|SSH_PRIVATE_KEY).' README.md | grep -c required)" -eq 2 && test -f .github/dependabot.yml && grep -q 'package-ecosystem: *"\{0,1\}github-actions' .github/dependabot.yml && grep -qi 'dependabot' README.md` passes, and in `deploy.yml` the step `Check the GitHub environment is configured` still comes before `SSH setup` and `Write env file`.
+- [ ] **2. Close the plan** — delete the files listed under "On close" and nothing else. Depends on: all. Commit message: `docs: finished plan`.
+
+## Done
+
+<!-- /next-step moves finished steps here with a one-line result note. -->
